@@ -23,6 +23,12 @@ After launch, a `Shield` item appears in the macOS menu bar.
 
 If your machine only has Command Line Tools installed, `swift run` may fail because `xcrun` cannot resolve the full macOS SDK. In that case, install full Xcode or switch `xcode-select` to a full Xcode installation.
 
+## GitHub Actions
+
+This repository includes a GitHub Actions workflow at `.github/workflows/build.yml` that runs `swift package resolve` and `swift build` on `macos-14`.
+
+This project imports `AppKit`, so the build must run on a macOS runner rather than Linux.
+
 ## Usage
 
 - Click `Shield` in the menu bar and choose `Activate Shield`

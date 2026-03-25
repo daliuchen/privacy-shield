@@ -4,7 +4,12 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   pull_request:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -27,3 +32,31 @@ jobs:
 
       - name: Build
         run: swift build
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Build release binary
+        run: swift build -c release
+
+      - name: Package release artifact
+        run: |
+          mkdir -p dist
+          cp .build/release/PrivacyShield dist/PrivacyShield
+          chmod +x dist/PrivacyShield
+          ditto -c -k --sequesterRsrc --keepParent dist/PrivacyShield PrivacyShield-macos.zip
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PrivacyShield-macos.zip
+          generate_release_notes: true

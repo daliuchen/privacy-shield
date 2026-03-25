@@ -25,7 +25,10 @@ If your machine only has Command Line Tools installed, `swift run` may fail beca
 
 ## GitHub Actions
 
-This repository includes a GitHub Actions workflow at `.github/workflows/build.yml` that runs `swift package resolve` and `swift build` on `macos-14`.
+This repository includes a GitHub Actions workflow at `.github/workflows/build.yml`.
+
+- Pushes to `main` and pull requests run `swift package resolve` and `swift build`
+- Tags like `v1.0.0` also build a release binary and publish `PrivacyShield-macos.zip` to GitHub Releases
 
 This project imports `AppKit`, so the build must run on a macOS runner rather than Linux.
 

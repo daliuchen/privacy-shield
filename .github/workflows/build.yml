@@ -48,12 +48,19 @@ jobs:
       - name: Build release binary
         run: swift build -c release
 
+      - name: Build app bundle
+        run: |
+          APP_NAME="Privacy Shield.app"
+          APP_DIR="dist/${APP_NAME}"
+          mkdir -p "${APP_DIR}/Contents/MacOS"
+          mkdir -p "${APP_DIR}/Contents/Resources"
+          cp packaging/Info.plist "${APP_DIR}/Contents/Info.plist"
+          cp .build/release/PrivacyShield "${APP_DIR}/Contents/MacOS/PrivacyShield"
+          chmod +x "${APP_DIR}/Contents/MacOS/PrivacyShield"
+
       - name: Package release artifact
         run: |
-          mkdir -p dist
-          cp .build/release/PrivacyShield dist/PrivacyShield
-          chmod +x dist/PrivacyShield
-          ditto -c -k --sequesterRsrc --keepParent dist/PrivacyShield PrivacyShield-macos.zip
+          ditto -c -k --sequesterRsrc --keepParent "dist/Privacy Shield.app" "PrivacyShield-macos.zip"
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2

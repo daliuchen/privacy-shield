@@ -70,6 +70,13 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate 
         ensureDefaultPIN()
         configureStatusItem()
         configureHotKey()
+        showLaunchNotice()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScreenConfigurationChange),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -86,8 +93,13 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate 
     }
 
     private func configureStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "Shield"
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = statusItem.button {
+            let image = NSImage(systemSymbolName: "lock.circle", accessibilityDescription: "Privacy Shield")
+            image?.isTemplate = true
+            button.image = image
+            button.toolTip = "Privacy Shield"
+        }
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Activate Shield", action: #selector(toggleShieldFromMenu), keyEquivalent: "")
@@ -137,6 +149,22 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate 
         )
     }
 
+    private func showLaunchNotice() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+
+            let alert = NSAlert()
+            alert.messageText = "Privacy Shield Is Running"
+            alert.informativeText = "The app is now running in the menu bar.\n\nUse the Shield menu or press Control + Command + L to activate the privacy overlay."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+            self.statusItem.button?.highlight(false)
+        }
+    }
+
     @objc
     private func toggleShieldFromMenu() {
         toggleShield()
@@ -154,8 +182,9 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate 
 
         NSApp.activate(ignoringOtherApps: true)
         windows.forEach { window in
+            window.setFrame(window.screen?.frame ?? window.frame, display: true)
             window.orderFrontRegardless()
-            window.makeKey()
+            window.makeKeyAndOrderFront(nil)
         }
     }
 
@@ -178,18 +207,32 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate 
             )
             window.level = .screenSaver
             window.backgroundColor = .black
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .moveToActiveSpace]
             window.isMovable = false
             window.hidesOnDeactivate = false
+            window.hasShadow = false
+            window.isOpaque = true
             window.delegate = self
 
-            let overlayView = OverlayView(frame: screen.frame)
+            let overlayView = OverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
             overlayView.onUnlockRequest = { [weak self] in
                 self?.requestUnlock()
             }
             window.contentView = overlayView
+            window.setFrame(screen.frame, display: true)
 
             windows.append(window)
+        }
+    }
+
+    @objc
+    private func handleScreenConfigurationChange() {
+        guard isShieldVisible else { return }
+        rebuildWindows()
+        windows.forEach { window in
+            window.setFrame(window.screen?.frame ?? window.frame, display: true)
+            window.orderFrontRegardless()
+            window.makeKeyAndOrderFront(nil)
         }
     }
 

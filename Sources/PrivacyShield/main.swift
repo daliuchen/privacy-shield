@@ -286,15 +286,18 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
         isShieldVisible = true
         NSApp.setActivationPolicy(.regular)
-        // Per Apple docs, makeKeyAndOrderFront may not work if the app is not
-        // already active. Activate first so the window ordering is guaranteed.
+        // activate() is asynchronous — the app is not immediately active after
+        // this call. Order windows to front now, then defer makeKeyAndOrderFront
+        // to the next run-loop iteration so activation has fully settled.
         NSApp.activate(ignoringOtherApps: true)
-        // Windows are pre-created; just reset UI and make them visible.
         windows.forEach { ($0.contentView as? OverlayView)?.resetToIdle() }
         windows.forEach { $0.orderFrontRegardless() }
-        if let first = windows.first {
-            first.makeKeyAndOrderFront(nil)
-            first.makeFirstResponder(first.contentView)
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isShieldVisible else { return }
+            if let first = self.windows.first {
+                first.makeKeyAndOrderFront(nil)
+                first.makeFirstResponder(first.contentView)
+            }
         }
     }
 

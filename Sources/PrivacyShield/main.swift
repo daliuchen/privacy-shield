@@ -185,9 +185,13 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         guard let pendingMenuAction else { return }
         self.pendingMenuAction = nil
 
-        switch pendingMenuAction {
-        case .toggleShield:
-            toggleShield()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self else { return }
+
+            switch pendingMenuAction {
+            case .toggleShield:
+                self.toggleShield()
+            }
         }
     }
 
@@ -196,13 +200,17 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
         isShieldVisible = true
         NSApp.setActivationPolicy(.regular)
-        rebuildWindows()
 
-        NSApp.activate(ignoringOtherApps: true)
-        windows.forEach { window in
-            window.setFrame(window.screen?.frame ?? window.frame, display: true)
-            window.orderFrontRegardless()
-            window.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isShieldVisible else { return }
+            self.rebuildWindows()
+            NSApp.activate(ignoringOtherApps: true)
+            for (index, window) in self.windows.enumerated() {
+                window.orderFrontRegardless()
+                if index == 0 {
+                    window.makeKeyAndOrderFront(nil)
+                }
+            }
         }
     }
 
@@ -248,10 +256,11 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private func handleScreenConfigurationChange() {
         guard isShieldVisible else { return }
         rebuildWindows()
-        windows.forEach { window in
-            window.setFrame(window.screen?.frame ?? window.frame, display: true)
+        for (index, window) in windows.enumerated() {
             window.orderFrontRegardless()
-            window.makeKeyAndOrderFront(nil)
+            if index == 0 {
+                window.makeKeyAndOrderFront(nil)
+            }
         }
     }
 

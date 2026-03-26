@@ -230,7 +230,7 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
             )
             window.level = .screenSaver
             window.backgroundColor = .black
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .moveToActiveSpace]
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
             window.isMovable = false
             window.hidesOnDeactivate = false
             window.hasShadow = false

@@ -271,6 +271,8 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         alert.addButton(withTitle: "Unlock")
         alert.addButton(withTitle: "Cancel")
 
+        // Alert must appear above shield windows which sit at .screenSaver level.
+        alert.window.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
         NSApp.activate(ignoringOtherApps: true)
         let response = alert.runModal()
         if response == .alertFirstButtonReturn, pinField.stringValue == currentPIN() {

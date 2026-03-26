@@ -195,6 +195,7 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         guard !isShieldVisible else { return }
 
         isShieldVisible = true
+        NSApp.setActivationPolicy(.regular)
         rebuildWindows()
 
         NSApp.activate(ignoringOtherApps: true)
@@ -208,6 +209,7 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private func hideShield() {
         isShieldVisible = false
         windows.forEach { $0.orderOut(nil) }
+        NSApp.setActivationPolicy(.accessory)
     }
 
     private func rebuildWindows() {

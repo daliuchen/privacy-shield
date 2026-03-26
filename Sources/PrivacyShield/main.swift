@@ -10,7 +10,14 @@ final class OverlayView: NSView {
     private let titleLabel = NSTextField(labelWithString: "Privacy Shield")
     private let subtitleLabel = NSTextField(labelWithString: "Screen hidden. Press Return or click to unlock.")
 
-    var onUnlockRequest: (() -> Void)?
+    // Inline PIN entry — avoids NSAlert level/modal issues entirely.
+    private let pinField = NSSecureTextField()
+    private let errorLabel = NSTextField(labelWithString: "Incorrect PIN")
+    private let pinStack = NSStackView()
+
+    override var acceptsFirstResponder: Bool { true }
+
+    var onUnlockAttempt: ((String) -> Void)?
     var onForceHide: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
@@ -26,16 +33,47 @@ final class OverlayView: NSView {
         subtitleLabel.textColor = NSColor.white.withAlphaComponent(0.75)
         subtitleLabel.alignment = .center
 
-        [titleLabel, subtitleLabel].forEach {
+        pinField.placeholderString = "Enter PIN"
+        pinField.font = .systemFont(ofSize: 16)
+        pinField.alignment = .center
+        pinField.focusRingType = .none
+
+        errorLabel.font = .systemFont(ofSize: 13)
+        errorLabel.textColor = .systemRed
+        errorLabel.alignment = .center
+        errorLabel.isHidden = true
+
+        let unlockButton = NSButton(title: "Unlock", target: self, action: #selector(attemptUnlock))
+        unlockButton.keyEquivalent = "\r"
+        unlockButton.bezelStyle = .rounded
+
+        let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancelUnlock))
+        cancelButton.bezelStyle = .rounded
+
+        let buttonRow = NSStackView(views: [cancelButton, unlockButton])
+        buttonRow.spacing = 12
+
+        pinStack.orientation = .vertical
+        pinStack.alignment = .centerX
+        pinStack.spacing = 10
+        pinStack.addArrangedSubview(pinField)
+        pinStack.addArrangedSubview(errorLabel)
+        pinStack.addArrangedSubview(buttonRow)
+        pinStack.isHidden = true
+
+        [titleLabel, subtitleLabel, pinStack].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             addSubview($0)
         }
 
         NSLayoutConstraint.activate([
             titleLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -18),
+            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -60),
             subtitleLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12)
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
+            pinStack.centerXAnchor.constraint(equalTo: centerXAnchor),
+            pinStack.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
+            pinField.widthAnchor.constraint(equalToConstant: 220),
         ])
     }
 
@@ -44,20 +82,49 @@ final class OverlayView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    func showPINEntry() {
+        guard pinStack.isHidden else { return }
+        subtitleLabel.isHidden = true
+        errorLabel.isHidden = true
+        pinField.stringValue = ""
+        pinStack.isHidden = false
+        window?.makeFirstResponder(pinField)
+    }
+
+    func resetToIdle() {
+        pinStack.isHidden = true
+        subtitleLabel.isHidden = false
+        pinField.stringValue = ""
+        window?.makeFirstResponder(self)
+    }
+
+    func showWrongPIN() {
+        errorLabel.isHidden = false
+        pinField.stringValue = ""
+        window?.makeFirstResponder(pinField)
+    }
+
+    @objc private func attemptUnlock() {
+        onUnlockAttempt?(pinField.stringValue)
+    }
+
+    @objc private func cancelUnlock() {
+        resetToIdle()
+    }
+
     override func mouseDown(with event: NSEvent) {
-        onUnlockRequest?()
+        showPINEntry()
     }
 
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == UInt16(kVK_Return) || event.keyCode == UInt16(kVK_ANSI_KeypadEnter) {
-            onUnlockRequest?()
-            return
-        }
-        if event.keyCode == UInt16(kVK_Escape) {
+        switch event.keyCode {
+        case UInt16(kVK_Escape):
             onForceHide?()
-            return
+        case UInt16(kVK_Return), UInt16(kVK_ANSI_KeypadEnter) where pinStack.isHidden:
+            showPINEntry()
+        default:
+            super.keyDown(with: event)
         }
-        super.keyDown(with: event)
     }
 }
 
@@ -212,7 +279,10 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         NSApp.activate(ignoringOtherApps: true)
         rebuildWindows()
         windows.forEach { $0.orderFrontRegardless() }
-        windows.first?.makeKey()
+        if let first = windows.first {
+            first.makeKeyAndOrderFront(nil)
+            first.makeFirstResponder(first.contentView)
+        }
     }
 
     private func hideShield() {
@@ -243,8 +313,13 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
             window.delegate = self
 
             let overlayView = OverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
-            overlayView.onUnlockRequest = { [weak self] in
-                self?.requestUnlock()
+            overlayView.onUnlockAttempt = { [weak self, weak overlayView] pin in
+                guard let self else { return }
+                if pin == self.currentPIN() {
+                    self.hideShield()
+                } else {
+                    overlayView?.showWrongPIN()
+                }
             }
             overlayView.onForceHide = { [weak self] in
                 self?.hideShield()
@@ -261,30 +336,19 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         guard isShieldVisible else { return }
         rebuildWindows()
         windows.forEach { $0.orderFrontRegardless() }
-        windows.first?.makeKey()
+        if let first = windows.first {
+            first.makeKeyAndOrderFront(nil)
+            first.makeFirstResponder(first.contentView)
+        }
     }
 
+    // Shows PIN entry on all overlays — used when hotkey is pressed while shield is active.
     private func requestUnlock() {
         guard isShieldVisible else { return }
-
-        let alert = NSAlert()
-        alert.messageText = "Unlock Privacy Shield"
-        alert.informativeText = "Enter the PIN to remove the screen overlay."
-        alert.alertStyle = .informational
-
-        let pinField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
-        pinField.placeholderString = "PIN"
-        alert.accessoryView = pinField
-
-        alert.addButton(withTitle: "Unlock")
-        alert.addButton(withTitle: "Cancel")
-
-        // Alert must appear above shield windows which sit at .screenSaver level.
-        alert.window.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
-        NSApp.activate(ignoringOtherApps: true)
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn, pinField.stringValue == currentPIN() {
-            hideShield()
+        windows.forEach { ($0.contentView as? OverlayView)?.showPINEntry() }
+        if let first = windows.first {
+            first.makeKeyAndOrderFront(nil)
+            first.makeFirstResponder(first.contentView)
         }
     }
 

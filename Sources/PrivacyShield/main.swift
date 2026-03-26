@@ -170,12 +170,65 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
     }
 
+    /// Draws the shield-lock icon as a template image for the menu bar.
+    private func createMenuBarIcon() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            let s = rect.size.width
+            ctx.translateBy(x: s / 2, y: s * 0.47)
+            let scale = s / 740.0
+            ctx.scaleBy(x: scale, y: scale)
+
+            // Shield silhouette — same bezier as the app icon
+            let shield = CGMutablePath()
+            shield.move(to: .init(x: 0, y: 310))
+            shield.addCurve(to: .init(x: 270, y: 190),
+                            control1: .init(x: 150, y: 310), control2: .init(x: 270, y: 280))
+            shield.addCurve(to: .init(x: 0, y: -330),
+                            control1: .init(x: 270, y: -10), control2: .init(x: 90, y: -230))
+            shield.addCurve(to: .init(x: -270, y: 190),
+                            control1: .init(x: -90, y: -230), control2: .init(x: -270, y: -10))
+            shield.addCurve(to: .init(x: 0, y: 310),
+                            control1: .init(x: -270, y: 280), control2: .init(x: -150, y: 310))
+            shield.closeSubpath()
+
+            ctx.addPath(shield)
+            ctx.setFillColor(NSColor.black.cgColor)
+            ctx.fillPath()
+
+            // Lock cutout — clearBlendMode carves transparent shapes out of the shield
+            ctx.setBlendMode(.clear)
+
+            // Lock body
+            let lockW: CGFloat = 130, lockH: CGFloat = 95
+            let lockY: CGFloat = -110
+            let lockRect = CGRect(x: -lockW / 2, y: lockY, width: lockW, height: lockH)
+            ctx.addPath(CGPath(roundedRect: lockRect, cornerWidth: 14, cornerHeight: 14, transform: nil))
+            ctx.fillPath()
+
+            // Shackle
+            let shR: CGFloat = 36
+            let shBase = lockRect.maxY - 4
+            ctx.setLineWidth(22)
+            ctx.setLineCap(.round)
+            ctx.move(to: .init(x: -shR, y: shBase))
+            ctx.addLine(to: .init(x: -shR, y: shBase + 42))
+            ctx.addArc(center: .init(x: 0, y: shBase + 42), radius: shR,
+                       startAngle: .pi, endAngle: 0, clockwise: false)
+            ctx.addLine(to: .init(x: shR, y: shBase))
+            ctx.strokePath()
+
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
     private func configureStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "lock.circle", accessibilityDescription: "Privacy Shield")
-            image?.isTemplate = true
-            button.image = image
+            button.image = createMenuBarIcon()
             button.toolTip = "Privacy Shield"
         }
 

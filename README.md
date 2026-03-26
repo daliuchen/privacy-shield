@@ -1,6 +1,14 @@
-# Privacy Shield
+<p align="center">
+  <img src="packaging/icon.svg" width="128" height="128" alt="Privacy Shield icon"/>
+</p>
 
-Privacy Shield is a lightweight macOS menu bar app that covers all displays with a full-screen privacy overlay while keeping your running tasks active.
+<h1 align="center">Privacy Shield</h1>
+
+<p align="center">
+  A lightweight macOS menu bar app that covers all displays with a full-screen privacy overlay while keeping your running tasks active.
+</p>
+
+---
 
 It is designed for quick visual privacy, not system-level security. Use it when you need to hide on-screen work from people nearby without interrupting long-running terminal jobs, browser automation, or other active processes.
 
@@ -53,9 +61,13 @@ privacy-shield/
 ├── Package.swift
 ├── README.md
 ├── LICENSE
-└── Sources/
-    └── PrivacyShield/
-        └── main.swift
+├── Sources/
+│   └── PrivacyShield/
+│       └── main.swift
+└── packaging/
+    ├── Info.plist
+    ├── icon.svg
+    └── generate-icon.swift
 ```
 
 ## Known Limitations

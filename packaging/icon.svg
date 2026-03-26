@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#242539"/>
+      <stop offset="100%" stop-color="#101220"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4D94FA"/>
+      <stop offset="100%" stop-color="#2966D1"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="200" fill="url(#bg)"/>
+  <!-- Shield -->
+  <path d="M512 202
+    C590 202 730 232 742 322
+    C754 412 754 522 742 602
+    C730 682 620 802 512 842
+    C404 802 294 682 282 602
+    C270 522 270 412 282 322
+    C294 232 434 202 512 202Z"
+    fill="url(#shield)" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+  <!-- Lock body -->
+  <rect x="447" y="510" width="130" height="100" rx="16" fill="rgba(255,255,255,0.95)"/>
+  <!-- Lock shackle -->
+  <path d="M473 510 L473 466 A39 39 0 0 1 551 466 L551 510"
+    stroke="rgba(255,255,255,0.95)" stroke-width="20" stroke-linecap="round" fill="none"/>
+  <!-- Keyhole -->
+  <circle cx="512" cy="555" r="15" fill="#2966D1"/>
+  <polygon points="505,542 512,524 519,542" fill="#2966D1"/>
+</svg>

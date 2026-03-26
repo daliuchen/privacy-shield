@@ -11,6 +11,7 @@ final class OverlayView: NSView {
     private let subtitleLabel = NSTextField(labelWithString: "Screen hidden. Press Return or click to unlock.")
 
     var onUnlockRequest: (() -> Void)?
+    var onForceHide: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -50,6 +51,10 @@ final class OverlayView: NSView {
     override func keyDown(with event: NSEvent) {
         if event.keyCode == UInt16(kVK_Return) || event.keyCode == UInt16(kVK_ANSI_KeypadEnter) {
             onUnlockRequest?()
+            return
+        }
+        if event.keyCode == UInt16(kVK_Escape) {
+            onForceHide?()
             return
         }
         super.keyDown(with: event)
@@ -240,6 +245,9 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
             let overlayView = OverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
             overlayView.onUnlockRequest = { [weak self] in
                 self?.requestUnlock()
+            }
+            overlayView.onForceHide = { [weak self] in
+                self?.hideShield()
             }
             window.contentView = overlayView
             window.setFrame(screen.frame, display: true)

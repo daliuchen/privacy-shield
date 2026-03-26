@@ -48,6 +48,11 @@ jobs:
       - name: Build release binary
         run: swift build -c release
 
+      - name: Generate app icon
+        run: |
+          swift packaging/generate-icon.swift AppIcon.iconset
+          iconutil -c icns AppIcon.iconset -o AppIcon.icns
+
       - name: Build app bundle
         run: |
           APP_NAME="Privacy Shield.app"
@@ -55,6 +60,7 @@ jobs:
           mkdir -p "${APP_DIR}/Contents/MacOS"
           mkdir -p "${APP_DIR}/Contents/Resources"
           cp packaging/Info.plist "${APP_DIR}/Contents/Info.plist"
+          cp AppIcon.icns "${APP_DIR}/Contents/Resources/AppIcon.icns"
           cp .build/release/PrivacyShield "${APP_DIR}/Contents/MacOS/PrivacyShield"
           chmod +x "${APP_DIR}/Contents/MacOS/PrivacyShield"
 

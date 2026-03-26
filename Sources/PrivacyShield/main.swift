@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import QuartzCore
 
 final class OverlayWindow: NSWindow {
     override var canBecomeKey: Bool { true }
@@ -131,18 +132,13 @@ final class OverlayView: NSView {
 final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     private let pinDefaultsKey = "PrivacyShieldPIN"
     private let defaultPin = "2468"
-    private enum PendingMenuAction {
-        case toggleShield
-    }
 
     private var statusItem: NSStatusItem!
     private var windows: [OverlayWindow] = []
     private var isShieldVisible = false
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
-    private var pendingMenuAction: PendingMenuAction?
-    // Set to true while waiting for didBecomeActive to complete window ordering.
-    private var pendingBringToFront = false
+    private var needsKeyFocus = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -250,35 +246,29 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
     @objc
     private func toggleShieldFromMenu() {
-        pendingMenuAction = .toggleShield
+        // Called synchronously from the menu item action.
+        // Shield windows are at level 1000 (above menu at ~101),
+        // so showing them while the menu is still on screen is fine.
+        toggleShield()
     }
 
     private func toggleShield() {
         isShieldVisible ? requestUnlock() : showShield()
     }
 
-    func menuWillOpen(_ menu: NSMenu) {
-        // Start the .accessory → .regular transition as early as possible so it
-        // has fully settled by the time we actually try to show shield windows.
-        NSApp.setActivationPolicy(.regular)
-    }
-
     func menuDidClose(_ menu: NSMenu) {
-        guard let pendingMenuAction else {
-            // Menu dismissed without action; revert policy if shield is not up.
-            if !isShieldVisible {
-                NSApp.setActivationPolicy(.accessory)
-            }
-            return
+        if !isShieldVisible {
+            NSApp.setActivationPolicy(.accessory)
         }
-        self.pendingMenuAction = nil
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            guard let self else { return }
-
-            switch pendingMenuAction {
-            case .toggleShield:
-                self.toggleShield()
+        // If showShield() was called during menu tracking, the alpha flip
+        // made the overlay visible immediately but makeKeyAndOrderFront was
+        // deferred (it's a no-op during menu tracking). Execute it now.
+        if needsKeyFocus {
+            needsKeyFocus = false
+            NSApp.activate(ignoringOtherApps: true)
+            if let first = windows.first {
+                first.makeKeyAndOrderFront(nil)
+                first.makeFirstResponder(first.contentView)
             }
         }
     }
@@ -288,38 +278,36 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
         isShieldVisible = true
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+
+        // 1. Make overlay visible immediately — alphaValue change is
+        //    purely a compositor property, works even during menu tracking.
         windows.forEach {
             ($0.contentView as? OverlayView)?.resetToIdle()
-            // Windows are already in the compositor at alphaValue=0.
-            // Flip to visible — no first-show rendering delay.
             $0.ignoresMouseEvents = false
             $0.alphaValue = 1
         }
+        // Force compositor to commit the alpha change RIGHT NOW, even
+        // if we're inside the menu's event-tracking run-loop mode.
+        CATransaction.flush()
+
+        // 2. Key focus — may fail during menu tracking, so also
+        //    schedule a retry for after the menu closes.
+        NSApp.activate(ignoringOtherApps: true)
         if let first = windows.first {
             first.makeKeyAndOrderFront(nil)
             first.makeFirstResponder(first.contentView)
         }
-    }
-
-    func applicationDidBecomeActive(_ notification: Notification) {
-        guard pendingBringToFront else { return }
-        pendingBringToFront = false
-        bringShieldToFront()
-    }
-
-    private func bringShieldToFront() {
-        guard isShieldVisible, let first = windows.first else { return }
-        first.makeKeyAndOrderFront(nil)
-        first.makeFirstResponder(first.contentView)
+        needsKeyFocus = true
     }
 
     private func hideShield() {
         isShieldVisible = false
+        needsKeyFocus = false
         windows.forEach {
             $0.alphaValue = 0
             $0.ignoresMouseEvents = true
         }
+        CATransaction.flush()
         NSApp.setActivationPolicy(.accessory)
     }
 
@@ -384,7 +372,12 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private func requestUnlock() {
         guard isShieldVisible else { return }
         windows.forEach { ($0.contentView as? OverlayView)?.showPINEntry() }
-        bringShieldToFront()
+        needsKeyFocus = true
+        NSApp.activate(ignoringOtherApps: true)
+        if let first = windows.first {
+            first.makeKeyAndOrderFront(nil)
+            first.makeFirstResponder(first.contentView)
+        }
     }
 
     @objc

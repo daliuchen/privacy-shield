@@ -286,6 +286,8 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
         isShieldVisible = true
         NSApp.setActivationPolicy(.regular)
+        // Per Apple docs, makeKeyAndOrderFront may not work if the app is not
+        // already active. Activate first so the window ordering is guaranteed.
         NSApp.activate(ignoringOtherApps: true)
         // Windows are pre-created; just reset UI and make them visible.
         windows.forEach { ($0.contentView as? OverlayView)?.resetToIdle() }

@@ -288,17 +288,17 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
         isShieldVisible = true
         NSApp.setActivationPolicy(.regular)
-        windows.forEach { ($0.contentView as? OverlayView)?.resetToIdle() }
-        // orderFrontRegardless works without activation — windows are in the
-        // right position immediately. makeKeyAndOrderFront (which needs the
-        // app to be active) is called from applicationDidBecomeActive so it
-        // fires exactly when the OS confirms activation is complete.
-        windows.forEach { $0.orderFrontRegardless() }
-        if NSApp.isActive {
-            bringShieldToFront()
-        } else {
-            pendingBringToFront = true
-            NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate(ignoringOtherApps: true)
+        windows.forEach {
+            ($0.contentView as? OverlayView)?.resetToIdle()
+            // Windows are already in the compositor at alphaValue=0.
+            // Flip to visible — no first-show rendering delay.
+            $0.ignoresMouseEvents = false
+            $0.alphaValue = 1
+        }
+        if let first = windows.first {
+            first.makeKeyAndOrderFront(nil)
+            first.makeFirstResponder(first.contentView)
         }
     }
 
@@ -316,7 +316,10 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
     private func hideShield() {
         isShieldVisible = false
-        windows.forEach { $0.orderOut(nil) }
+        windows.forEach {
+            $0.alphaValue = 0
+            $0.ignoresMouseEvents = true
+        }
         NSApp.setActivationPolicy(.accessory)
     }
 
@@ -356,6 +359,13 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
             window.contentView = overlayView
             window.setFrame(screen.frame, display: true)
 
+            // Put the window in the compositor immediately, fully transparent
+            // and passthrough. This eliminates first-show rendering latency —
+            // showShield() just flips alphaValue instead of showing a new window.
+            window.alphaValue = isShieldVisible ? 1 : 0
+            window.ignoresMouseEvents = !isShieldVisible
+            window.orderFrontRegardless()
+
             windows.append(window)
         }
     }
@@ -364,7 +374,6 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private func handleScreenConfigurationChange() {
         rebuildWindows()
         guard isShieldVisible else { return }
-        windows.forEach { $0.orderFrontRegardless() }
         if let first = windows.first {
             first.makeKeyAndOrderFront(nil)
             first.makeFirstResponder(first.contentView)

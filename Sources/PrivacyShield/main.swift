@@ -147,6 +147,9 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         ensureDefaultPIN()
         configureStatusItem()
         configureHotKey()
+        // Pre-create windows so they are already registered with the window
+        // server before showShield is called — avoids first-show timing issues.
+        rebuildWindows()
         showLaunchNotice()
         NotificationCenter.default.addObserver(
             self,
@@ -282,10 +285,10 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         guard !isShieldVisible else { return }
 
         isShieldVisible = true
-        // Ensure regular policy for hotkey path; no-op if already raised via menuDidClose.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        rebuildWindows()
+        // Windows are pre-created; just reset UI and make them visible.
+        windows.forEach { ($0.contentView as? OverlayView)?.resetToIdle() }
         windows.forEach { $0.orderFrontRegardless() }
         if let first = windows.first {
             first.makeKeyAndOrderFront(nil)
@@ -341,8 +344,8 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
     @objc
     private func handleScreenConfigurationChange() {
-        guard isShieldVisible else { return }
         rebuildWindows()
+        guard isShieldVisible else { return }
         windows.forEach { $0.orderFrontRegardless() }
         if let first = windows.first {
             first.makeKeyAndOrderFront(nil)

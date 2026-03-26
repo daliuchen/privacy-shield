@@ -252,13 +252,21 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         isShieldVisible ? requestUnlock() : showShield()
     }
 
-    func menuDidClose(_ menu: NSMenu) {
-        guard let pendingMenuAction else { return }
-        self.pendingMenuAction = nil
-
-        // Raise activation policy immediately when menu closes so it settles
-        // before we try to show windows.
+    func menuWillOpen(_ menu: NSMenu) {
+        // Start the .accessory → .regular transition as early as possible so it
+        // has fully settled by the time we actually try to show shield windows.
         NSApp.setActivationPolicy(.regular)
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        guard let pendingMenuAction else {
+            // Menu dismissed without action; revert policy if shield is not up.
+            if !isShieldVisible {
+                NSApp.setActivationPolicy(.accessory)
+            }
+            return
+        }
+        self.pendingMenuAction = nil
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             guard let self else { return }

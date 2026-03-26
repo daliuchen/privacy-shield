@@ -174,7 +174,6 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     @objc
     private func toggleShieldFromMenu() {
         pendingMenuAction = .toggleShield
-        statusItem.menu?.cancelTracking()
     }
 
     private func toggleShield() {
@@ -184,6 +183,10 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     func menuDidClose(_ menu: NSMenu) {
         guard let pendingMenuAction else { return }
         self.pendingMenuAction = nil
+
+        // Raise activation policy immediately when menu closes so it settles
+        // before we try to show windows.
+        NSApp.setActivationPolicy(.regular)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             guard let self else { return }
@@ -199,19 +202,12 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         guard !isShieldVisible else { return }
 
         isShieldVisible = true
+        // Ensure regular policy for hotkey path; no-op if already raised via menuDidClose.
         NSApp.setActivationPolicy(.regular)
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.isShieldVisible else { return }
-            self.rebuildWindows()
-            NSApp.activate(ignoringOtherApps: true)
-            for (index, window) in self.windows.enumerated() {
-                window.orderFrontRegardless()
-                if index == 0 {
-                    window.makeKeyAndOrderFront(nil)
-                }
-            }
-        }
+        NSApp.activate(ignoringOtherApps: true)
+        rebuildWindows()
+        windows.forEach { $0.orderFrontRegardless() }
+        windows.first?.makeKey()
     }
 
     private func hideShield() {
@@ -256,12 +252,8 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private func handleScreenConfigurationChange() {
         guard isShieldVisible else { return }
         rebuildWindows()
-        for (index, window) in windows.enumerated() {
-            window.orderFrontRegardless()
-            if index == 0 {
-                window.makeKeyAndOrderFront(nil)
-            }
-        }
+        windows.forEach { $0.orderFrontRegardless() }
+        windows.first?.makeKey()
     }
 
     private func requestUnlock() {

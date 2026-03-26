@@ -141,6 +141,8 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
     private var pendingMenuAction: PendingMenuAction?
+    // Set to true while waiting for didBecomeActive to complete window ordering.
+    private var pendingBringToFront = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -286,19 +288,30 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
         isShieldVisible = true
         NSApp.setActivationPolicy(.regular)
-        // activate() is asynchronous — the app is not immediately active after
-        // this call. Order windows to front now, then defer makeKeyAndOrderFront
-        // to the next run-loop iteration so activation has fully settled.
-        NSApp.activate(ignoringOtherApps: true)
         windows.forEach { ($0.contentView as? OverlayView)?.resetToIdle() }
+        // orderFrontRegardless works without activation — windows are in the
+        // right position immediately. makeKeyAndOrderFront (which needs the
+        // app to be active) is called from applicationDidBecomeActive so it
+        // fires exactly when the OS confirms activation is complete.
         windows.forEach { $0.orderFrontRegardless() }
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.isShieldVisible else { return }
-            if let first = self.windows.first {
-                first.makeKeyAndOrderFront(nil)
-                first.makeFirstResponder(first.contentView)
-            }
+        if NSApp.isActive {
+            bringShieldToFront()
+        } else {
+            pendingBringToFront = true
+            NSApp.activate(ignoringOtherApps: true)
         }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard pendingBringToFront else { return }
+        pendingBringToFront = false
+        bringShieldToFront()
+    }
+
+    private func bringShieldToFront() {
+        guard isShieldVisible, let first = windows.first else { return }
+        first.makeKeyAndOrderFront(nil)
+        first.makeFirstResponder(first.contentView)
     }
 
     private func hideShield() {
@@ -362,10 +375,7 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private func requestUnlock() {
         guard isShieldVisible else { return }
         windows.forEach { ($0.contentView as? OverlayView)?.showPINEntry() }
-        if let first = windows.first {
-            first.makeKeyAndOrderFront(nil)
-            first.makeFirstResponder(first.contentView)
-        }
+        bringShieldToFront()
     }
 
     @objc

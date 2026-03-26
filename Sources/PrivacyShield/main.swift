@@ -56,14 +56,19 @@ final class OverlayView: NSView {
     }
 }
 
-final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     private let pinDefaultsKey = "PrivacyShieldPIN"
     private let defaultPin = "2468"
+    private enum PendingMenuAction {
+        case toggleShield
+    }
+
     private var statusItem: NSStatusItem!
     private var windows: [OverlayWindow] = []
     private var isShieldVisible = false
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
+    private var pendingMenuAction: PendingMenuAction?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -102,6 +107,7 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate 
         }
 
         let menu = NSMenu()
+        menu.delegate = self
         menu.addItem(withTitle: "Activate Shield", action: #selector(toggleShieldFromMenu), keyEquivalent: "")
         menu.addItem(withTitle: "Set PIN", action: #selector(promptForPINChange), keyEquivalent: "")
         menu.addItem(.separator())
@@ -167,11 +173,22 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate 
 
     @objc
     private func toggleShieldFromMenu() {
-        toggleShield()
+        pendingMenuAction = .toggleShield
+        statusItem.menu?.cancelTracking()
     }
 
     private func toggleShield() {
         isShieldVisible ? requestUnlock() : showShield()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        guard let pendingMenuAction else { return }
+        self.pendingMenuAction = nil
+
+        switch pendingMenuAction {
+        case .toggleShield:
+            toggleShield()
+        }
     }
 
     private func showShield() {

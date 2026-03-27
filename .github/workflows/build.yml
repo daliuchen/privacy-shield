@@ -64,6 +64,10 @@ jobs:
           cp .build/release/PrivacyShield "${APP_DIR}/Contents/MacOS/PrivacyShield"
           chmod +x "${APP_DIR}/Contents/MacOS/PrivacyShield"
 
+      - name: Ad-hoc code sign
+        run: |
+          codesign --sign - --deep --force --options runtime "dist/Privacy Shield.app"
+
       - name: Package release artifact
         run: |
           ditto -c -k --sequesterRsrc --keepParent "dist/Privacy Shield.app" "PrivacyShield-macos.zip"

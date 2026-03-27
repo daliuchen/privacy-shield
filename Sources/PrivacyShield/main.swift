@@ -145,9 +145,6 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         ensureDefaultPIN()
         configureStatusItem()
         configureHotKey()
-        // Pre-create windows so they are already registered with the window
-        // server before showShield is called — avoids first-show timing issues.
-        rebuildWindows()
         showLaunchNotice()
         NotificationCenter.default.addObserver(
             self,
@@ -332,19 +329,17 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         isShieldVisible = true
         NSApp.setActivationPolicy(.regular)
 
-        // 1. Make overlay visible immediately — alphaValue change is
-        //    purely a compositor property, works even during menu tracking.
-        windows.forEach {
-            ($0.contentView as? OverlayView)?.resetToIdle()
-            $0.ignoresMouseEvents = false
-            $0.alphaValue = 1
-        }
-        // Force compositor to commit the alpha change RIGHT NOW, even
-        // if we're inside the menu's event-tracking run-loop mode.
+        // Create fresh windows each time — avoids stale window state that
+        // can cause crashes on sleep/wake (the previous alphaValue=0 approach
+        // left windows permanently in the compositor, triggering a
+        // use-after-free in _NSWindowTransformAnimation on wake).
+        rebuildWindows()
+
+        windows.forEach { $0.orderFrontRegardless() }
+        // Force compositor to present the windows RIGHT NOW, even if
+        // we're inside the menu's event-tracking run-loop mode.
         CATransaction.flush()
 
-        // 2. Key focus — may fail during menu tracking, so also
-        //    schedule a retry for after the menu closes.
         NSApp.activate(ignoringOtherApps: true)
         if let first = windows.first {
             first.makeKeyAndOrderFront(nil)
@@ -356,11 +351,7 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private func hideShield() {
         isShieldVisible = false
         needsKeyFocus = false
-        windows.forEach {
-            $0.alphaValue = 0
-            $0.ignoresMouseEvents = true
-        }
-        CATransaction.flush()
+        windows.forEach { $0.orderOut(nil) }
         NSApp.setActivationPolicy(.accessory)
     }
 
@@ -400,21 +391,15 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
             window.contentView = overlayView
             window.setFrame(screen.frame, display: true)
 
-            // Put the window in the compositor immediately, fully transparent
-            // and passthrough. This eliminates first-show rendering latency —
-            // showShield() just flips alphaValue instead of showing a new window.
-            window.alphaValue = isShieldVisible ? 1 : 0
-            window.ignoresMouseEvents = !isShieldVisible
-            window.orderFrontRegardless()
-
             windows.append(window)
         }
     }
 
     @objc
     private func handleScreenConfigurationChange() {
-        rebuildWindows()
         guard isShieldVisible else { return }
+        rebuildWindows()
+        windows.forEach { $0.orderFrontRegardless() }
         if let first = windows.first {
             first.makeKeyAndOrderFront(nil)
             first.makeFirstResponder(first.contentView)

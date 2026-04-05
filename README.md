@@ -28,6 +28,8 @@ It is designed for quick visual privacy, not system-level security. Use it when 
 brew install --cask daliuchen/privacy-shield/privacy-shield
 ```
 
+> Homebrew will look for the cask in this repository directly — no separate tap repo needed.
+
 ### Manual
 
 Download `PrivacyShield-macos.zip` from [Releases](https://github.com/daliuchen/privacy-shield/releases), unzip, and move the app to `/Applications`.

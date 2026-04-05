@@ -22,15 +22,21 @@ It is designed for quick visual privacy, not system-level security. Use it when 
 
 ## Install
 
+### Homebrew (recommended)
+
+```bash
+brew install --cask daliuchen/privacy-shield/privacy-shield
+```
+
+### Manual
+
 Download `PrivacyShield-macos.zip` from [Releases](https://github.com/daliuchen/privacy-shield/releases), unzip, and move the app to `/Applications`.
 
-Because the app is not notarized by Apple, macOS will block it on first launch. To allow it:
+Because the app is not notarized by Apple, macOS will block it on first launch. Right-click the app and choose **Open**, or run:
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/Privacy Shield.app"
 ```
-
-Then double-click to open normally.
 
 ## Run
 

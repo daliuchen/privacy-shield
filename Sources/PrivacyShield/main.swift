@@ -152,6 +152,34 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+
+        // Tear down overlay windows before sleep and rebuild on wake to avoid
+        // use-after-free crashes in the compositor (_NSWindowTransformAnimation).
+        let wsnc = NSWorkspace.shared.notificationCenter
+        wsnc.addObserver(
+            self,
+            selector: #selector(handleWillSleep),
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
+        wsnc.addObserver(
+            self,
+            selector: #selector(handleDidWake),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+        wsnc.addObserver(
+            self,
+            selector: #selector(handleScreensDidSleep),
+            name: NSWorkspace.screensDidSleepNotification,
+            object: nil
+        )
+        wsnc.addObserver(
+            self,
+            selector: #selector(handleScreensDidWake),
+            name: NSWorkspace.screensDidWakeNotification,
+            object: nil
+        )
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -403,6 +431,56 @@ final class ShieldController: NSObject, NSApplicationDelegate, NSWindowDelegate,
         if let first = windows.first {
             first.makeKeyAndOrderFront(nil)
             first.makeFirstResponder(first.contentView)
+        }
+    }
+
+    // Sleep/wake: tear down windows before sleep, rebuild on wake.
+    // This handles both system sleep AND display-only sleep (lid close,
+    // screen timeout, etc.) to cover all paths that can crash the compositor.
+
+    @objc
+    private func handleWillSleep() {
+        tearDownForSleep()
+    }
+
+    @objc
+    private func handleDidWake() {
+        rebuildAfterWake()
+    }
+
+    @objc
+    private func handleScreensDidSleep() {
+        tearDownForSleep()
+    }
+
+    @objc
+    private func handleScreensDidWake() {
+        rebuildAfterWake()
+    }
+
+    private var shieldWasVisibleBeforeSleep = false
+
+    private func tearDownForSleep() {
+        guard isShieldVisible else { return }
+        shieldWasVisibleBeforeSleep = true
+        windows.forEach { $0.close() }
+        windows.removeAll()
+    }
+
+    private func rebuildAfterWake() {
+        guard shieldWasVisibleBeforeSleep else { return }
+        shieldWasVisibleBeforeSleep = false
+
+        // Delay slightly to let the display fully initialize after wake.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self, self.isShieldVisible else { return }
+            self.rebuildWindows()
+            self.windows.forEach { $0.orderFrontRegardless() }
+            NSApp.activate(ignoringOtherApps: true)
+            if let first = self.windows.first {
+                first.makeKeyAndOrderFront(nil)
+                first.makeFirstResponder(first.contentView)
+            }
         }
     }
 

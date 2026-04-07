@@ -127,6 +127,13 @@ jobs:
 
             app "Privacy Shield.app"
 
+            caveats <<~EOS
+              Privacy Shield is ad-hoc signed and not notarized by Apple.
+              macOS Gatekeeper may block the first launch. To fix, run:
+
+                xattr -cr "/Applications/Privacy Shield.app"
+            EOS
+
             zap trash: [
               "~/Library/Preferences/com.daliuchen.privacyshield.plist",
             ]

@@ -1,8 +1,8 @@
 cask "privacy-shield" do
-  version "0.0.5"
-  sha256 "bce87661422ac7b68958e1697c8fa72faac78a4acffbbeb175df804ffcc97802"
+  version "0.0.6"
+  sha256 "219e188889a4230dfeb049a25a9b8981b02bde8befd1ffac97e0a3c811279f6d"
 
-  url "https://github.com/daliuchen/privacy-shield/releases/download/v0.0.5/PrivacyShield-macos.zip"
+  url "https://github.com/daliuchen/privacy-shield/releases/download/v0.0.6/PrivacyShield-macos.zip"
   name "Privacy Shield"
   desc "macOS menu bar app that covers all displays with a privacy overlay"
   homepage "https://github.com/daliuchen/privacy-shield"

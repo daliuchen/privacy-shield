@@ -30,6 +30,12 @@ brew install --cask daliuchen/privacy-shield/privacy-shield
 
 > Homebrew will look for the cask in this repository directly — no separate tap repo needed.
 
+### Uninstall
+
+```bash
+brew uninstall --cask privacy-shield && brew untap daliuchen/privacy-shield
+```
+
 ### Manual
 
 Download `PrivacyShield-macos.zip` from [Releases](https://github.com/daliuchen/privacy-shield/releases), unzip, and move the app to `/Applications`.
